@@ -2,7 +2,7 @@
     "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
     "contentVersion": "1.0.0.0",
     "metadata": {
-        "comments": "Creating Azure VNET infrastructure with spoke vnets",
+        "comments": "Creating Azure VWAN infrastructure with spoke vnets",
         "author": "Ravisankar Pegada (rpegada@paloaltonetworks.com)"
     },
     "parameters": {
@@ -228,69 +228,12 @@
         },
 		{
             "type": "Microsoft.Network/virtualNetworks", 
-            "name": "[variables('hub_vnet_name')]",
-            "apiVersion": "[variables('var_apiVersion')]",
-            "location": "[resourceGroup().location]",
-            "properties": {
-                "addressSpace": {
-                    "addressPrefixes": [
-                        "[variables('hub_vnet_cidr')]"
-                    ]
-                },
-                "subnets": [
-                    {
-                        "name": "[variables('hub_private_subnet_name')]",
-                        "properties": {
-                            "addressPrefix": "[variables('hub_private_subnet_cidr')]",
-							"networkSecurityGroup": {
-                                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsg_name_hub_subnets'))]"
-                            },
-							"delegations": [
-								{
-									"name": "PaloAltoNetworks.Cloudngfw.firewalls",
-									"id": "[concat(resourceId('Microsoft.Network/virtualNetworks/subnets', variables('hub_vnet_name'), variables('hub_private_subnet_name')), '/delegations/PaloAltoNetworks.Cloudngfw.firewalls')]",
-									"properties": {
-										"serviceName": "PaloAltoNetworks.Cloudngfw/firewalls"
-									},
-									"type": "Microsoft.Network/virtualNetworks/subnets/delegations"
-								}
-							],
-							"privateEndpointNetworkPolicies": "Disabled",
-							"privateLinkServiceNetworkPolicies": "Enabled"
-                        }
-                    },
-					{
-                        "name": "[variables('hub_public_subnet_name')]",
-                        "properties": {
-                            "addressPrefix": "[variables('hub_public_subnet_cidr')]",
-							"networkSecurityGroup": {
-                                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsg_name_hub_subnets'))]"
-                            },
-							"delegations": [
-								{
-									"name": "PaloAltoNetworks.Cloudngfw.firewalls",
-									"id": "[concat(resourceId('Microsoft.Network/virtualNetworks/subnets', variables('hub_vnet_name'), variables('hub_public_subnet_name')), '/delegations/PaloAltoNetworks.Cloudngfw.firewalls')]",
-									"properties": {
-										"serviceName": "PaloAltoNetworks.Cloudngfw/firewalls"
-									},
-									"type": "Microsoft.Network/virtualNetworks/subnets/delegations"
-								}
-							],
-							"privateEndpointNetworkPolicies": "Disabled",
-							"privateLinkServiceNetworkPolicies": "Enabled"
-                        }
-                    }
-                ]
-            },
-            "dependsOn": [
-                "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsg_name_hub_subnets'))]"
-            ]
-        },
-		{
-            "type": "Microsoft.Network/virtualNetworks", 
             "name": "[variables('spoke1_vnet_name')]",
             "apiVersion": "[variables('var_apiVersion')]",
             "location": "[resourceGroup().location]",
+			"dependsOn": [
+				"[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsg_name_spoke_subnets'))]"
+            ],
             "properties": {
                 "addressSpace": {
                     "addressPrefixes": [
@@ -304,24 +247,20 @@
                             "addressPrefix": "[variables('spoke1_subnet_cidr')]",
 							"networkSecurityGroup": {
                                 "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsg_name_spoke_subnets'))]"
-                            },
-							"routeTable": {
-                                "id": "[resourceId('Microsoft.Network/routeTables', variables('rt_name'))]"
                             }
                         }
                     }
                 ]
-            },
-			"dependsOn": [
-                "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsg_name_spoke_subnets'))]",
-				"[resourceId('Microsoft.Network/routeTables', variables('rt_name'))]"
-            ]
+            }
         },
 		{
             "type": "Microsoft.Network/virtualNetworks", 
             "name": "[variables('spoke2_vnet_name')]",
             "apiVersion": "[variables('var_apiVersion')]",
             "location": "[resourceGroup().location]",
+			"dependsOn": [
+				"[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsg_name_spoke_subnets'))]"
+            ],
             "properties": {
                 "addressSpace": {
                     "addressPrefixes": [
@@ -335,99 +274,12 @@
                             "addressPrefix": "[variables('spoke2_subnet_cidr')]",
 							"networkSecurityGroup": {
                                 "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsg_name_spoke_subnets'))]"
-                            },
-							"routeTable": {
-                                "id": "[resourceId('Microsoft.Network/routeTables', variables('rt_name'))]"
                             }
                         }
                     }
                 ]
-            },
-			"dependsOn": [
-                "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsg_name_spoke_subnets'))]",
-				"[resourceId('Microsoft.Network/routeTables', variables('rt_name'))]"
-            ]
+            }
         },
-		{
-			"type":"Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
-			"apiVersion":"2019-09-01",
-			"name": "[variables('HubVnetToSpoke1PeeringName')]",
-			"location":"[resourceGroup().location]",
-			"dependsOn": [
-				   "[concat('Microsoft.Network/virtualNetworks/', variables('hub_vnet_name'))]",
-				   "[concat('Microsoft.Network/virtualNetworks/', variables('spoke1_vnet_name'))]"
-			   ],
-			"comments": "This is the peering from Hub VNET to Spoke1 VNet",
-			   "properties": {
-				   "allowVirtualNetworkAccess": "true",
-				   "allowForwardedTraffic": "true",
-				   "allowGatewayTransit": "false",
-				   "useRemoteGateways": "false",
-				   "remoteVirtualNetwork": {
-					   "id": "[resourceId('Microsoft.Network/virtualNetworks',variables('spoke1_vnet_name'))]"
-				   }
-			   }
-        },
-		{
-            "type":"Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
-            "apiVersion":"2019-09-01",
-			"name": "[variables('HubVnetToSpoke2PeeringName')]",
-			"location":"[resourceGroup().location]",
-			"dependsOn": [
-				   "[concat('Microsoft.Network/virtualNetworks/', variables('hub_vnet_name'))]",
-				   "[concat('Microsoft.Network/virtualNetworks/', variables('spoke2_vnet_name'))]"
-			   ],
-			"comments": "This is the peering from Hub VNET to Spoke2 VNet",
-			   "properties": {
-				   "allowVirtualNetworkAccess": "true",
-				   "allowForwardedTraffic": "true",
-				   "allowGatewayTransit": "false",
-				   "useRemoteGateways": "false",
-				   "remoteVirtualNetwork": {
-					   "id": "[resourceId('Microsoft.Network/virtualNetworks',variables('spoke2_vnet_name'))]"
-				   }
-			   }
-        },
-		{
-			"type":"Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
-			"apiVersion":"2019-09-01",
-			"name": "[variables('Spoke1VnetToHubVnetPeeringName')]",
-			"location":"[resourceGroup().location]",
-			"dependsOn": [
-				   "[concat('Microsoft.Network/virtualNetworks/', variables('spoke1_vnet_name'))]",
-				   "[concat('Microsoft.Network/virtualNetworks/', variables('hub_vnet_name'))]"
-			   ],
-			"comments": "This is the peering from VNet Spoke1 to Hub VNet",
-			   "properties": {
-				   "allowVirtualNetworkAccess": "true",
-				   "allowForwardedTraffic": "true",
-				   "allowGatewayTransit": "false",
-				   "useRemoteGateways": "false",
-				   "remoteVirtualNetwork": {
-					   "id": "[resourceId('Microsoft.Network/virtualNetworks',variables('hub_vnet_name'))]"
-				   }
-			   }
-		},
-		{
-			"type":"Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
-			"apiVersion":"2019-09-01",
-			"name": "[variables('Spoke2VnetToHubVnetPeeringName')]",
-			"location":"[resourceGroup().location]",
-			"dependsOn": [
-				   "[concat('Microsoft.Network/virtualNetworks/', variables('spoke2_vnet_name'))]",
-				   "[concat('Microsoft.Network/virtualNetworks/', variables('hub_vnet_name'))]"
-			   ],
-			"comments": "This is the peering from VNet Spoke2 to Hub VNet",
-			   "properties": {
-				   "allowVirtualNetworkAccess": "true",
-				   "allowForwardedTraffic": "true",
-				   "allowGatewayTransit": "false",
-				   "useRemoteGateways": "false",
-				   "remoteVirtualNetwork": {
-					   "id": "[resourceId('Microsoft.Network/virtualNetworks',variables('hub_vnet_name'))]"
-				   }
-			   }
-		},
 		{
             "comments": "CREATE_vm1_NIC",
             "type": "Microsoft.Network/networkInterfaces",
@@ -632,7 +484,146 @@
 			}
 		  }
 		},
-
+		{
+            "type": "Microsoft.Network/virtualNetworks", 
+            "name": "[variables('hub_vnet_name')]",
+            "apiVersion": "[variables('var_apiVersion')]",
+            "location": "[resourceGroup().location]",
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "[variables('hub_vnet_cidr')]"
+                    ]
+                },
+                "subnets": [
+                    {
+                        "name": "[variables('hub_private_subnet_name')]",
+                        "properties": {
+                            "addressPrefix": "[variables('hub_private_subnet_cidr')]",
+							"networkSecurityGroup": {
+                                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsg_name_spoke_subnets'))]"
+                            },
+							"delegations": [
+								{
+									"name": "PaloAltoNetworks.Cloudngfw.firewalls",
+									"id": "[concat(resourceId('Microsoft.Network/virtualNetworks/subnets', variables('hub_vnet_name'), variables('hub_private_subnet_name')), '/delegations/PaloAltoNetworks.Cloudngfw.firewalls')]",
+									"properties": {
+										"serviceName": "PaloAltoNetworks.Cloudngfw/firewalls"
+									},
+									"type": "Microsoft.Network/virtualNetworks/subnets/delegations"
+								}
+							],
+							"privateEndpointNetworkPolicies": "Disabled",
+							"privateLinkServiceNetworkPolicies": "Enabled"
+                        }
+                    },
+					{
+                        "name": "[variables('hub_public_subnet_name')]",
+                        "properties": {
+                            "addressPrefix": "[variables('hub_public_subnet_cidr')]",
+							"networkSecurityGroup": {
+                                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsg_name_spoke_subnets'))]"
+                            },
+							"delegations": [
+								{
+									"name": "PaloAltoNetworks.Cloudngfw.firewalls",
+									"id": "[concat(resourceId('Microsoft.Network/virtualNetworks/subnets', variables('hub_vnet_name'), variables('hub_public_subnet_name')), '/delegations/PaloAltoNetworks.Cloudngfw.firewalls')]",
+									"properties": {
+										"serviceName": "PaloAltoNetworks.Cloudngfw/firewalls"
+									},
+									"type": "Microsoft.Network/virtualNetworks/subnets/delegations"
+								}
+							],
+							"privateEndpointNetworkPolicies": "Disabled",
+							"privateLinkServiceNetworkPolicies": "Enabled"
+                        }
+                    }
+                ]
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsg_name_spoke_subnets'))]"
+            ]
+        },
+		{
+			"type":"Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
+			"apiVersion":"2019-09-01",
+			"name": "[variables('HubVnetToSpoke1PeeringName')]",
+			"location":"[resourceGroup().location]",
+			"dependsOn": [
+				   "[concat('Microsoft.Network/virtualNetworks/', variables('hub_vnet_name'))]",
+				   "[concat('Microsoft.Network/virtualNetworks/', variables('spoke1_vnet_name'))]"
+			   ],
+			"comments": "This is the peering from Hub VNET to Spoke1 VNet",
+			   "properties": {
+				   "allowVirtualNetworkAccess": "true",
+				   "allowForwardedTraffic": "true",
+				   "allowGatewayTransit": "false",
+				   "useRemoteGateways": "false",
+				   "remoteVirtualNetwork": {
+					   "id": "[resourceId('Microsoft.Network/virtualNetworks',variables('spoke1_vnet_name'))]"
+				   }
+			   }
+        },
+		{
+            "type":"Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
+            "apiVersion":"2019-09-01",
+			"name": "[variables('HubVnetToSpoke2PeeringName')]",
+			"location":"[resourceGroup().location]",
+			"dependsOn": [
+				   "[concat('Microsoft.Network/virtualNetworks/', variables('hub_vnet_name'))]",
+				   "[concat('Microsoft.Network/virtualNetworks/', variables('spoke2_vnet_name'))]"
+			   ],
+			"comments": "This is the peering from Hub VNET to Spoke2 VNet",
+			   "properties": {
+				   "allowVirtualNetworkAccess": "true",
+				   "allowForwardedTraffic": "true",
+				   "allowGatewayTransit": "false",
+				   "useRemoteGateways": "false",
+				   "remoteVirtualNetwork": {
+					   "id": "[resourceId('Microsoft.Network/virtualNetworks',variables('spoke2_vnet_name'))]"
+				   }
+			   }
+        },
+		{
+			"type":"Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
+			"apiVersion":"2019-09-01",
+			"name": "[variables('Spoke1VnetToHubVnetPeeringName')]",
+			"location":"[resourceGroup().location]",
+			"dependsOn": [
+				   "[concat('Microsoft.Network/virtualNetworks/', variables('spoke1_vnet_name'))]",
+				   "[concat('Microsoft.Network/virtualNetworks/', variables('hub_vnet_name'))]"
+			   ],
+			"comments": "This is the peering from VNet Spoke1 to Hub VNet",
+			   "properties": {
+				   "allowVirtualNetworkAccess": "true",
+				   "allowForwardedTraffic": "true",
+				   "allowGatewayTransit": "false",
+				   "useRemoteGateways": "false",
+				   "remoteVirtualNetwork": {
+					   "id": "[resourceId('Microsoft.Network/virtualNetworks',variables('hub_vnet_name'))]"
+				   }
+			   }
+		},
+		{
+			"type":"Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
+			"apiVersion":"2019-09-01",
+			"name": "[variables('Spoke2VnetToHubVnetPeeringName')]",
+			"location":"[resourceGroup().location]",
+			"dependsOn": [
+				   "[concat('Microsoft.Network/virtualNetworks/', variables('spoke2_vnet_name'))]",
+				   "[concat('Microsoft.Network/virtualNetworks/', variables('hub_vnet_name'))]"
+			   ],
+			"comments": "This is the peering from VNet Spoke2 to Hub VNet",
+			   "properties": {
+				   "allowVirtualNetworkAccess": "true",
+				   "allowForwardedTraffic": "true",
+				   "allowGatewayTransit": "false",
+				   "useRemoteGateways": "false",
+				   "remoteVirtualNetwork": {
+					   "id": "[resourceId('Microsoft.Network/virtualNetworks',variables('hub_vnet_name'))]"
+				   }
+			   }
+		},
 		{
             "type": "Microsoft.OperationalInsights/workspaces",
             "apiVersion": "2021-12-01-preview",
@@ -652,7 +643,7 @@
                 "publicNetworkAccessForIngestion": "Enabled",
                 "publicNetworkAccessForQuery": "Enabled"
             }
-        }
+        }		
     ],
     "outputs": {
         "web-server-url": {
